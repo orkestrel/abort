@@ -1,4 +1,6 @@
 import type { AbortInterface, AbortOptions } from './types.js'
+import { isString } from '@orkestrel/contract'
+import { linkSignal } from './helpers.js'
 
 /**
  * A cancellation handle — a thin, traceable wrapper over a native
@@ -26,17 +28,17 @@ import type { AbortInterface, AbortOptions } from './types.js'
  * ```
  */
 export class Abort implements AbortInterface {
+	readonly #controller = new AbortController()
 	readonly id: string
 	readonly signal: AbortSignal
-	readonly #controller = new AbortController()
 
+	// Construction is the defensive JS-boundary (AGENTS §14): `options?.id` is guarded
+	// with `isString` here so a malformed options bag falls back to a fresh id rather
+	// than adopting a non-string value. `abort(reason)` stays dependency-free and
+	// forwards any reason verbatim — a documented invariant, never guarded.
 	constructor(options?: AbortOptions) {
-		this.id = options?.id ?? crypto.randomUUID()
-		const parent = options?.signal
-		this.signal =
-			parent === undefined
-				? this.#controller.signal
-				: AbortSignal.any([this.#controller.signal, parent])
+		this.id = isString(options?.id) ? options.id : crypto.randomUUID()
+		this.signal = linkSignal(this.#controller.signal, options?.signal)
 	}
 
 	get aborted(): boolean {

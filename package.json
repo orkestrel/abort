@@ -1,23 +1,21 @@
 {
-	"name": "@orkestrel/markdown",
+	"name": "@orkestrel/abort",
 	"version": "0.0.1",
-	"description": "Markdown parser toolkit — a fast, zero-surprise CommonMark-style parser with GFM tables, a typed AST, contract-backed node guards, and safe HTML rendering. Part of the @orkestrel line.",
+	"description": "A typed AbortController wrapper — stable ids, parent-signal linking via AbortSignal.any, idempotent abort with reason preservation. Part of the @orkestrel line.",
 	"keywords": [
-		"ast",
-		"commonmark",
-		"gfm",
-		"html",
-		"markdown",
-		"markdown-parser",
-		"parser",
+		"abort",
+		"abort-controller",
+		"abort-signal",
+		"cancellation",
+		"signals",
 		"typescript"
 	],
-	"homepage": "https://github.com/orkestrel/markdown#readme",
-	"bugs": "https://github.com/orkestrel/markdown/issues",
+	"homepage": "https://github.com/orkestrel/abort#readme",
+	"bugs": "https://github.com/orkestrel/abort/issues",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/orkestrel/markdown.git"
+		"url": "git+https://github.com/orkestrel/abort.git"
 	},
 	"files": [
 		"dist",

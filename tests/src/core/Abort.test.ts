@@ -1,5 +1,6 @@
+import type { AbortInterface } from '@src/core'
 import { Abort, createAbort } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createRecorder } from '../../setup.js'
 
 // Abort — a thin traceable wrapper over a native AbortController, with optional
@@ -307,5 +308,39 @@ describe('Abort', () => {
 		expect(constructed.id).toBe(created.id)
 		expect(constructed.aborted).toBe(created.aborted)
 		expect(constructed.signal.reason).toBe(created.signal.reason)
+	})
+
+	// ── id guard regression (isString(options?.id)) ──────────────────────────
+	//
+	// The constructor guards `options?.id` with `isString`: a non-string value
+	// falls back to `crypto.randomUUID()`, while an empty string IS a string and
+	// is preserved verbatim (it is not "falsy therefore absent").
+
+	it('a non-string id falls back to a generated non-empty id', () => {
+		const abort = new Abort({ id: undefined })
+
+		expect(typeof abort.id).toBe('string')
+		expect(abort.id.length > 0).toBe(true)
+	})
+
+	it('an empty-string id is preserved verbatim, not replaced by a generated id', () => {
+		const abort = new Abort({ id: '' })
+
+		expect(abort.id).toBe('')
+	})
+})
+
+// ── Type-level shape (positive assertions only) ────────────────────────────
+
+describe('Abort types', () => {
+	it('AbortInterface exposes id, signal, aborted, and abort()', () => {
+		expectTypeOf<AbortInterface>().toHaveProperty('id').toEqualTypeOf<string>()
+		expectTypeOf<AbortInterface>().toHaveProperty('signal').toEqualTypeOf<AbortSignal>()
+		expectTypeOf<AbortInterface>().toHaveProperty('aborted').toEqualTypeOf<boolean>()
+		expectTypeOf<AbortInterface['abort']>().toBeFunction()
+	})
+
+	it('createAbort returns an AbortInterface', () => {
+		expectTypeOf(createAbort()).toEqualTypeOf<AbortInterface>()
 	})
 })

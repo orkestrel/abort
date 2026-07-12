@@ -1,8 +1,8 @@
-# Aborts
+# Abort
 
-> The cancellation primitive: a thin, traceable wrapper over a native `AbortController`. An `Abort` carries a trace `id`, exposes a standard `AbortSignal` you hand to any cancellable API, and can be **linked to a parent signal** so it fires when either its own `abort()` is called or the parent aborts — cancellation cascades through a tree of handles with no listener bookkeeping. The cancellation half of the substrate's time-and-cancellation pair (with [timeouts](timeouts.md)): every async layer (workers, the runner, the future agent loop) bounds work against a `signal`.
+> The cancellation primitive: a thin, traceable wrapper over a native `AbortController`. An `Abort` carries a trace `id`, exposes a standard `AbortSignal` you hand to any cancellable API, and can be **linked to a parent signal** so it fires when either its own `abort()` is called or the parent aborts — cancellation cascades through a tree of handles with no listener bookkeeping. Every async layer (workers, the runner, the future agent loop) bounds work against a `signal`.
 >
-> Deliberately thin. It does **not** re-implement cancellation machinery — the native `AbortController` is the engine; `Abort` only adds a traceable `id` and parent-linking on top. It does **not** wrap the signal in a bespoke interface, so it stays interoperable with `fetch`, streams, and every Web API that already speaks `AbortSignal`. And it is **event-free for now** — a pure functional primitive with no Emitter wiring; the observability pass owns that, which keeps the surface minimal. Source: [`src/core/aborts`](../../src/core/aborts). Surfaced through the `@src/core` barrel.
+> Deliberately thin. It does **not** re-implement cancellation machinery — the native `AbortController` is the engine; `Abort` only adds a traceable `id` and parent-linking on top. It does **not** wrap the signal in a bespoke interface, so it stays interoperable with `fetch`, streams, and every Web API that already speaks `AbortSignal`. And it is **event-free for now** — a pure functional primitive with no Emitter wiring; the observability pass owns that, which keeps the surface minimal. Source: [`src/core`](../../src/core). Surfaced through the `@src/core` barrel.
 
 ## Surface
 
@@ -23,6 +23,12 @@ The `signal` is a plain `AbortSignal`, so it drops into anything that takes one.
 | API           | Kind     | Summary                                                                         |
 | ------------- | -------- | ------------------------------------------------------------------------------- |
 | `createAbort` | function | Create an `AbortInterface`, optionally with a trace `id` and a parent `signal`. |
+
+### Helpers
+
+| API          | Kind     | Summary                                                                                                                    |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `linkSignal` | function | Link an own `AbortSignal` to an optional parent signal, returning `AbortSignal.any([own, parent])` when a parent is given. |
 
 ### Entities
 
@@ -53,7 +59,7 @@ The public methods of `AbortInterface` — every call-signature member listed (i
 
 ## Contract
 
-These invariants hold across `src/core/aborts` ↔ `aborts.md`:
+These invariants hold across `src/core` ↔ `abort.md`:
 
 1. **DOC ↔ SOURCE bijection.** Every `function` / `class` / `interface` / `type` row in the `## Surface` tables is a real export of the aborts module, and every export appears as a Surface row — exhaustive, both directions (AGENTS §22).
 2. **Native wrapper.** `Abort` owns a private `AbortController`; `abort(reason?)` delegates to `controller.abort(reason)`, and `aborted` reads the exposed `signal.aborted`. No re-implemented cancellation machinery.
@@ -125,13 +131,12 @@ async function run<T>(work: Promise<T>, abort = createAbort()): Promise<T> {
 
 ## Tests
 
-- [`tests/guides/parity.test.ts`](../../tests/guides/src/parity.test.ts) — the `## Surface` ↔ `src/core/aborts` bijection (value + type exports) and the `AbortInterface` ↔ `Abort` method bijection.
-- [`tests/src/core/aborts/Abort.test.ts`](../../tests/src/core/aborts/Abort.test.ts) — `abort()` flips `aborted` and fires `signal`, `abort(reason)` propagates the reason, a second/third `abort(reason2)` is an idempotent no-op (`signal.reason` stays the first reason), a fresh handle is not aborted, parent linking (the signal fires on the parent's abort and on its own; a parent that aborts first propagates the parent's reason), and `id` is honored / stable / unique (across a 1,000-instance batch). Edge cases: every reason type (`undefined`/omitted → a default `AbortError` `DOMException`; string / object / the falsy-but-defined `null` / `0` / `''` / `false` / `NaN` preserved by identity; first falsy reason still sticks), a parent already aborted at construction (born aborted, carrying the parent's reason, own `abort()` then inert), chained Aborts (an `Abort` parented to another's `signal`, 2–3 levels: a root abort fans down with its reason, a mid/leaf abort never flows up), and `new Abort` ↔ `createAbort` parity.
-- [`tests/src/core/aborts/factories.test.ts`](../../tests/src/core/aborts/factories.test.ts) — `createAbort` returns a working `AbortInterface` and honors `id` / a parent `signal`.
-- [`tests/src/core/integration.test.ts`](../../tests/src/core/integration.test.ts) — composition with [timeouts](timeouts.md): a `Timeout` parented to an `Abort`'s `signal` (the abort clears the deadline, which then never expires), a deep `Abort → Abort → Timeout` chain (a root abort cascades through the child abort and clears the leaf timeout), and racing a `Timeout.signal` against real async work under both expiry and parent-clear.
+- [`tests/guides/src/parity.test.ts`](../../tests/guides/src/parity.test.ts) — the `## Surface` ↔ `src/core` bijection (value + type exports) and the `AbortInterface` ↔ `Abort` method bijection.
+- [`tests/src/core/Abort.test.ts`](../../tests/src/core/Abort.test.ts) — `abort()` flips `aborted` and fires `signal`, `abort(reason)` propagates the reason, a second/third `abort(reason2)` is an idempotent no-op (`signal.reason` stays the first reason), a fresh handle is not aborted, parent linking (the signal fires on the parent's abort and on its own; a parent that aborts first propagates the parent's reason), and `id` is honored / stable / unique (across a 1,000-instance batch). Edge cases: every reason type (`undefined`/omitted → a default `AbortError` `DOMException`; string / object / the falsy-but-defined `null` / `0` / `''` / `false` / `NaN` preserved by identity; first falsy reason still sticks), a parent already aborted at construction (born aborted, carrying the parent's reason, own `abort()` then inert), chained Aborts (an `Abort` parented to another's `signal`, 2–3 levels: a root abort fans down with its reason, a mid/leaf abort never flows up), and `new Abort` ↔ `createAbort` parity.
+- [`tests/src/core/factories.test.ts`](../../tests/src/core/factories.test.ts) — `createAbort` returns a working `AbortInterface` and honors `id` / a parent `signal`.
+- [`tests/src/core/helpers.test.ts`](../../tests/src/core/helpers.test.ts) — `linkSignal` returns the own signal unchanged when no parent is given, and `AbortSignal.any([own, parent])` when a parent is given (including a parent already aborted).
 
 ## See also
 
-- [`timeouts.md`](timeouts.md) — the deadline primitive; the time-bound half of the same pair (a `signal` that fires on expiry).
 - [`AGENTS.md`](../../AGENTS.md) — the rules; §10 lifecycle (`abort`), §4.1 single-word members, §22 documentation-as-contracts.
-- [`README.md`](README.md) — the guides index.
+- [`README.md`](../README.md) — the guides index.

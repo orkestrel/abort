@@ -1,5 +1,6 @@
+import type { AbortInterface } from '@src/core'
 import { createAbort } from '@src/core'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createRecorder } from '../../setup.js'
 
 // The abort factory — that `createAbort` returns a working AbortInterface. Full
@@ -33,5 +34,9 @@ describe('createAbort', () => {
 		parent.abort()
 
 		expect(abort.aborted).toBe(true)
+	})
+
+	it('return type matches AbortInterface', () => {
+		expectTypeOf(createAbort()).toEqualTypeOf<AbortInterface>()
 	})
 })
