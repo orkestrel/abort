@@ -310,14 +310,13 @@ describe('Abort', () => {
 		expect(constructed.signal.reason).toBe(created.signal.reason)
 	})
 
-	// ── id guard regression (isString(options?.id)) ──────────────────────────
+	// ── id absence regression ────────────────────────────────────────────────
 	//
-	// The constructor guards `options?.id` with `isString`: a non-string value
-	// falls back to `crypto.randomUUID()`, while an empty string IS a string and
+	// Omitting `id` falls back to `crypto.randomUUID()`, while an empty string
 	// is preserved verbatim (it is not "falsy therefore absent").
 
-	it('a non-string id falls back to a generated non-empty id', () => {
-		const abort = new Abort({ id: undefined })
+	it('an omitted id falls back to a generated non-empty id', () => {
+		const abort = new Abort()
 
 		expect(typeof abort.id).toBe('string')
 		expect(abort.id.length > 0).toBe(true)
