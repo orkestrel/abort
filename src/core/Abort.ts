@@ -1,6 +1,5 @@
 import type { AbortInterface, AbortOptions } from './types.js'
-import { isString } from '@orkestrel/contract'
-import { linkSignal } from './helpers.js'
+import { linkSignal, validateAbortOptions } from './helpers.js'
 
 /**
  * A cancellation handle — a thin, traceable wrapper over a native
@@ -18,7 +17,8 @@ import { linkSignal } from './helpers.js'
  *   has ALREADY aborted makes the handle born aborted (carrying the parent's reason).
  * - **Traceable.** Each handle carries an `id` (caller-supplied or a random UUID)
  *   for correlating cancellations across the system.
- * - **Event-free.** A pure functional primitive — no Emitter, no events.
+ * - **Native observation.** The standard `AbortSignal` is the complete
+ *   interoperable observation surface.
  *
  * @example
  * ```ts
@@ -28,17 +28,23 @@ import { linkSignal } from './helpers.js'
  * ```
  */
 export class Abort implements AbortInterface {
-	readonly #controller = new AbortController()
+	readonly #controller: AbortController
 	readonly id: string
 	readonly signal: AbortSignal
 
-	// Construction is the defensive JS-boundary (AGENTS §14): `options?.id` is guarded
-	// with `isString` here so a malformed options bag falls back to a fresh id rather
-	// than adopting a non-string value. `abort(reason)` stays dependency-free and
-	// forwards any reason verbatim — a documented invariant, never guarded.
+	/**
+	 * Create a cancellation handle.
+	 *
+	 * @param options - Optional trace id and native parent signal.
+	 * @throws {@link import('@orkestrel/contract').ContractError} When provided options are not a plain record, a
+	 *   defined `id` is not a string, or a defined `signal` is not a native
+	 *   `AbortSignal`.
+	 */
 	constructor(options?: AbortOptions) {
-		this.id = isString(options?.id) ? options.id : crypto.randomUUID()
-		this.signal = linkSignal(this.#controller.signal, options?.signal)
+		const input = validateAbortOptions(options)
+		this.#controller = new AbortController()
+		this.id = input.id ?? crypto.randomUUID()
+		this.signal = linkSignal(this.#controller.signal, input.signal)
 	}
 
 	get aborted(): boolean {

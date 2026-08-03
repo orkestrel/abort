@@ -14,6 +14,9 @@ import { Abort } from './Abort.js'
  * @param options - Optional `id` (a trace label; defaults to a random UUID) and
  *   `signal` (a parent signal whose abort also fires the created handle's signal)
  * @returns A working {@link AbortInterface}
+ * @throws {@link import('@orkestrel/contract').ContractError} When provided
+ *   options are not a plain record, a defined `id` is not a string, or a
+ *   defined `signal` is not a native `AbortSignal`.
  *
  * @example
  * ```ts

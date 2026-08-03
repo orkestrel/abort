@@ -1,4 +1,5 @@
 import type { AbortInterface } from '@src/core'
+import { isContractError } from '@orkestrel/contract'
 import { Abort, createAbort } from '@src/core'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createRecorder } from '../../setup.js'
@@ -326,6 +327,25 @@ describe('Abort', () => {
 		const abort = new Abort({ id: '' })
 
 		expect(abort.id).toBe('')
+	})
+
+	it('routes invalid construction through the options boundary before signal linking', () => {
+		const signal = { aborted: false }
+		let error: unknown
+		try {
+			Reflect.construct(Abort, [{ signal }])
+		} catch (caught) {
+			error = caught
+		}
+
+		expect(isContractError(error)).toBe(true)
+		if (!isContractError(error)) throw new Error('Expected a ContractError')
+		expect(error.code).toBe('placement')
+		expect(error.context).toEqual({
+			path: ['options', 'signal'],
+			limit: 'native AbortSignal or undefined',
+			received: 'object',
+		})
 	})
 })
 

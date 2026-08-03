@@ -41,6 +41,12 @@ it default to a random UUID; pass `options.signal` to link the handle's
 Aborting is idempotent — the first reason sticks, and `abort()` with no
 reason defaults to an `AbortError` `DOMException`.
 
+Construction is a strict JavaScript boundary. `validateAbortOptions` exposes
+the same once-read validation as a public helper, returning a fresh normalized
+copy without absent optional keys. Malformed or unreadable options, nonstring
+ids, and nonnative option signals throw structured `ContractError`s before a
+controller or linked signal is created.
+
 ## Guide
 
 For the full surface — the `Abort` class, `AbortInterface`, and the
