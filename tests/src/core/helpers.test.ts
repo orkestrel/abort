@@ -1,8 +1,8 @@
 import type { AbortOptions } from '@src/core'
 import { isContractError, preview } from '@orkestrel/contract'
 import { linkSignal, validateAbortOptions } from '@src/core'
+import { createRecorder } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { createRecorder } from '../../setup.js'
 
 let reads: PropertyKey[] = []
 

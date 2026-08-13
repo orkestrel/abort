@@ -1,7 +1,7 @@
 import type { AbortInterface } from '@src/core'
 import { createAbort } from '@src/core'
+import { createRecorder } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { createRecorder } from '../../setup.js'
 
 // The abort factory — that `createAbort` returns a working AbortInterface. Full
 // behavior (parent linking, reason propagation) lives in Abort.test.ts; here we

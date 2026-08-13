@@ -1,8 +1,8 @@
 import type { AbortInterface } from '@src/core'
 import { isContractError } from '@orkestrel/contract'
 import { Abort, createAbort } from '@src/core'
+import { createRecorder } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { createRecorder } from '../../setup.js'
 
 // Abort — a thin traceable wrapper over a native AbortController, with optional
 // parent-signal linking. Real signals, no mocks (AGENTS §16); aborting is
