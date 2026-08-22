@@ -1,6 +1,6 @@
 {
 	"name": "@orkestrel/abort",
-	"version": "0.0.7",
+	"version": "0.0.8",
 	"description": "A typed AbortController wrapper — stable ids, parent-signal linking via AbortSignal.any, idempotent abort with reason preservation. Part of the @orkestrel line.",
 	"keywords": [
 		"abort",
@@ -65,7 +65,7 @@
 		"prepublishOnly": "npm run format:check && npm run lint:check && npm run check && npm run build && npm test"
 	},
 	"dependencies": {
-		"@orkestrel/contract": "^0.0.12"
+		"@orkestrel/contract": "^0.0.13"
 	},
 	"devDependencies": {
 		"@microsoft/api-extractor": "^7.59.0",
