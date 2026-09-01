@@ -20,7 +20,7 @@ import { Abort } from './Abort.js'
  *
  * @example
  * ```ts
- * import { createAbort } from '@src/core'
+ * import { createAbort } from '@orkestrel/abort'
  *
  * const abort = createAbort()
  * const work = fetch(url, { signal: abort.signal })
