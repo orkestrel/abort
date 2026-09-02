@@ -2,7 +2,7 @@ import type { AbortInterface, AbortOptions } from './types.js'
 import { Abort } from './Abort.js'
 
 /**
- * Create a cancellation handle — a thin, traceable wrapper over a native
+ * Creates a cancellation handle — a thin, traceable wrapper over a native
  * `AbortController` whose `signal` can be linked to a parent signal.
  *
  * @remarks

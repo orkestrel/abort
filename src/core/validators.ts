@@ -1,5 +1,5 @@
 /**
- * Determine whether a value is a native `AbortSignal`.
+ * Determines whether a value is a native `AbortSignal`.
  *
  * @remarks
  * The platform `AbortSignal.prototype.aborted` getter performs the native brand
@@ -7,8 +7,8 @@
  * the contained boundary keeps the guard total for hostile or revoked proxies.
  *
  * @param value - The value to inspect.
- * @returns `true` only when the platform getter accepts `value` as an
- *   `AbortSignal`; otherwise `false`.
+ * @returns True if the platform getter accepts `value` as an
+ *   `AbortSignal`; false otherwise.
  *
  * @example
  * ```ts

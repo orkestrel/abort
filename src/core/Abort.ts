@@ -2,7 +2,7 @@ import type { AbortInterface, AbortOptions } from './types.js'
 import { linkSignal, validateAbortOptions } from './helpers.js'
 
 /**
- * A cancellation handle — a thin, traceable wrapper over a native
+ * Represents a cancellation handle — a thin, traceable wrapper over a native
  * `AbortController` whose exposed `signal` can be linked to a parent signal.
  *
  * @remarks
@@ -33,7 +33,7 @@ export class Abort implements AbortInterface {
 	readonly signal: AbortSignal
 
 	/**
-	 * Create a cancellation handle.
+	 * Creates a cancellation handle.
 	 *
 	 * @param options - Optional trace id and native parent signal.
 	 * @throws {@link import('@orkestrel/contract').ContractError} When provided options are not a plain record, a
