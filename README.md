@@ -51,7 +51,7 @@ controller or linked signal is created.
 
 For the full surface — the `Abort` class, `AbortInterface`, and the
 parent-linking contract — see
-[`guides/src/abort.md`](guides/src/abort.md).
+[`guides/abort.md`](guides/abort.md).
 
 ## Package
 
