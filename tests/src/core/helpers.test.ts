@@ -1,7 +1,7 @@
 import type { AbortOptions } from '@src/core'
-import { isContractError, preview } from '@orkestrel/contract'
+import { isContractError } from '@orkestrel/contract'
 import { linkSignal, validateAbortOptions } from '@src/core'
-import { createRecorder } from '@orkestrel/test'
+import { captureError, createRecorder } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 let reads: PropertyKey[] = []
@@ -60,13 +60,7 @@ describe('validateAbortOptions', () => {
 		if (descriptor === undefined) throw new Error('Expected the native aborted descriptor')
 		const input = {}
 		Object.defineProperty(input, 'id', descriptor)
-		let error: unknown
-
-		try {
-			Reflect.apply(validateAbortOptions, undefined, [input])
-		} catch (caught) {
-			error = caught
-		}
+		const error = captureError(() => Reflect.apply(validateAbortOptions, undefined, [input]))
 
 		expect(isContractError(error)).toBe(true)
 		if (!isContractError(error)) throw new Error('Expected a ContractError')
@@ -80,7 +74,7 @@ describe('validateAbortOptions', () => {
 	})
 
 	it.each([
-		['options', null, 'bound', ['options'], 'plain record or undefined', preview(null)],
+		['options', null, 'bound', ['options'], 'plain record or undefined', 'null'],
 		['id', { id: 7 }, 'literal', ['options', 'id'], 'string or undefined', '7'],
 		[
 			'signal',
@@ -93,12 +87,7 @@ describe('validateAbortOptions', () => {
 	])(
 		'rejects invalid %s with exact contract context',
 		(_field, input, code, path, limit, received) => {
-			let error: unknown
-			try {
-				Reflect.apply(validateAbortOptions, undefined, [input])
-			} catch (caught) {
-				error = caught
-			}
+			const error = captureError(() => Reflect.apply(validateAbortOptions, undefined, [input]))
 
 			expect(isContractError(error)).toBe(true)
 			if (!isContractError(error)) throw new Error('Expected a ContractError')
@@ -164,12 +153,7 @@ describe('linkSignal', () => {
 
 	it('rejects a non-native own signal with exact placement context', () => {
 		const own = { aborted: false }
-		let error: unknown
-		try {
-			Reflect.apply(linkSignal, undefined, [own, undefined])
-		} catch (caught) {
-			error = caught
-		}
+		const error = captureError(() => Reflect.apply(linkSignal, undefined, [own, undefined]))
 
 		expect(isContractError(error)).toBe(true)
 		if (!isContractError(error)) throw new Error('Expected a ContractError')
@@ -177,19 +161,14 @@ describe('linkSignal', () => {
 		expect(error.context).toEqual({
 			path: ['own'],
 			limit: 'native AbortSignal',
-			received: preview(own),
+			received: 'object',
 		})
 	})
 
 	it('rejects a non-native parent signal with exact placement context', () => {
 		const own = new AbortController()
 		const parent = { aborted: false }
-		let error: unknown
-		try {
-			Reflect.apply(linkSignal, undefined, [own.signal, parent])
-		} catch (caught) {
-			error = caught
-		}
+		const error = captureError(() => Reflect.apply(linkSignal, undefined, [own.signal, parent]))
 
 		expect(isContractError(error)).toBe(true)
 		if (!isContractError(error)) throw new Error('Expected a ContractError')
@@ -197,7 +176,7 @@ describe('linkSignal', () => {
 		expect(error.context).toEqual({
 			path: ['parent'],
 			limit: 'native AbortSignal or undefined',
-			received: preview(parent),
+			received: 'object',
 		})
 	})
 })

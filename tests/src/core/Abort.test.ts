@@ -1,12 +1,12 @@
 import type { AbortInterface } from '@src/core'
 import { isContractError } from '@orkestrel/contract'
 import { Abort, createAbort } from '@src/core'
-import { createRecorder } from '@orkestrel/test'
+import { captureError, createRecorder } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 // Abort — a thin traceable wrapper over a native AbortController, with optional
-// parent-signal linking. Real signals, no mocks (AGENTS §16); aborting is
-// synchronous so no timers are needed here.
+// parent-signal linking. Real signals, no mocks (`AGENTS.md` § Non-negotiable
+// rules); aborting is synchronous so no timers are needed here.
 
 describe('Abort', () => {
 	it('a fresh abort is not aborted', () => {
@@ -331,12 +331,7 @@ describe('Abort', () => {
 
 	it('routes invalid construction through the options boundary before signal linking', () => {
 		const signal = { aborted: false }
-		let error: unknown
-		try {
-			Reflect.construct(Abort, [{ signal }])
-		} catch (caught) {
-			error = caught
-		}
+		const error = captureError(() => Reflect.construct(Abort, [{ signal }]))
 
 		expect(isContractError(error)).toBe(true)
 		if (!isContractError(error)) throw new Error('Expected a ContractError')

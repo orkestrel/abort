@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isBrowserVuePath } from './setup'
+import { isBrowserVuePath } from './setup.js'
 
 describe('isBrowserVuePath', () => {
 	it('accepts a browser Vue SFC path under each separator family', () => {

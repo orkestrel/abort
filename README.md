@@ -3,7 +3,7 @@
 A typed **`AbortController`** wrapper — the foundational cancellation
 primitive that async work (a fetch, a timeout, a queue task) links into to
 observe cancellation. Deliberately small: a stable, traceable `id`, a
-`signal` that can be linked to a parent signal via `AbortSignal.any` (so a
+`signal` that can be linked to a parent signal through `AbortSignal.any` (so a
 parent's abort propagates without re-implementing listener wiring), and
 idempotent `abort()` that preserves whichever reason arrives first. Part of
 the `@orkestrel` line.
@@ -16,8 +16,8 @@ npm install @orkestrel/abort
 
 ## Requirements
 
-- Node.js >= 24
-- ESM-only (no CommonJS build)
+- Node.js >= 22.12.0, matching the `engines` field in `package.json`
+- ESM and CommonJS entry points, selected by the `exports` field in `package.json`
 
 ## Usage
 
@@ -26,7 +26,7 @@ import { createAbort } from '@orkestrel/abort'
 
 const abort = createAbort()
 const work = fetch(url, { signal: abort.signal })
-abort.abort() // cancels the fetch via the native signal
+abort.abort() // cancels the fetch through the native signal
 
 // Link to a parent so a parent cancellation also aborts the child.
 const parent = createAbort()

@@ -1,5 +1,5 @@
 // The consumer-side guides-parity drop-in: runs `@orkestrel/guide`'s checks against
-// this repo's own `guides/README.md` manifest. The four constants below are this
+// this repo's own `guides/README.md` manifest. The constants below are this
 // package's own, and are the only part a sibling package changes.
 
 import { describe, expect, it } from 'vitest'
@@ -18,8 +18,9 @@ import {
 	resolveLink,
 } from '@orkestrel/guide'
 import { readFileSync } from 'node:fs'
-import { requireValue } from '@orkestrel/test'
+import { createRecorder, requireValue } from '@orkestrel/test'
 import { readInventory } from '@orkestrel/test/server'
+import { createAbort } from '@src/core'
 
 /** Every fence language this package's guides are allowed to use. */
 const FENCE_LANGUAGES = Object.freeze(['ts'])
@@ -168,3 +169,68 @@ for (const entry of manifest) {
 		})
 	})
 }
+
+// The EXECUTED half. Every preceding check reads a name — from the guide text or
+// from the barrel — and a name that resolves proves nothing about the sentence
+// beside it, so a fence whose comment claims a value the code contradicts passes
+// all of them. The cases here run the flagship fences and assert the values their
+// comments claim. Change a fence, change the transcription beside it.
+describe('flagship fences', () => {
+	const guideText = requireValue(files['guides/abort.md'], 'Missing file: guides/abort.md')
+
+	it('cascades a parent abort into the child, flipping aborted and firing the signal', () => {
+		// Transcribed from the parent-linking fence. Its comment claims both that the
+		// child reads aborted and that the child's signal fired, so the recorder proves
+		// the event beside the flag rather than in place of it.
+		const parent = createAbort({ id: 'request' })
+		const child = createAbort({ id: 'sub-task', signal: parent.signal })
+		const fired = createRecorder<readonly []>()
+		child.signal.addEventListener('abort', fired.handler)
+
+		parent.abort()
+
+		expect(child.aborted).toBe(true)
+		expect(fired.count).toBe(1)
+	})
+
+	it('keeps the abort reason the create-and-abort fence claims', () => {
+		// Transcribed from the create-and-abort fence, minus its `openStream` line,
+		// which this package does not publish. The comment claims `signal.reason`
+		// carries the value handed to `abort`.
+		const abort = createAbort()
+
+		abort.abort('user navigated away')
+
+		expect(abort.signal.reason).toBe('user navigated away')
+	})
+
+	it('flips aborted on the handle the quick-start fence creates', () => {
+		// Transcribed from the Surface quick-start fence, minus its `fetch` line, which
+		// would make a network call. The comment claims `aborted` flips true, and that
+		// half of it runs without the request.
+		const abort = createAbort({ id: 'fetch-user' })
+
+		abort.abort()
+
+		expect(abort.aborted).toBe(true)
+	})
+
+	it('carries the fence lines the transcriptions copy', () => {
+		// The presence guards beside the transcriptions: they prove the transcribed
+		// lines are still the documented ones, and nothing about behavior. Binding the
+		// construction line alone would leave a comment free to claim the opposite
+		// value and stay green, so every line carrying a claim is bound.
+		expect(guideText).toContain(
+			"const child = createAbort({ id: 'sub-task', signal: parent.signal })",
+		)
+		expect(guideText).toContain(
+			'parent.abort() // child.aborted is now true; child.signal has fired',
+		)
+		expect(guideText).toContain(
+			"abort.abort('user navigated away') // signal.reason carries the value",
+		)
+		expect(guideText).toContain(
+			'abort.abort() // cancels the in-flight fetch through the native signal; `aborted` flips true',
+		)
+	})
+})

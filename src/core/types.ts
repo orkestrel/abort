@@ -2,9 +2,9 @@
  * Represents the options for `createAbort` and `Abort` construction.
  *
  * @remarks
- * `id` labels the handle for tracing; when omitted or `undefined`, a UUID is
- * generated. `signal` links a native parent signal to the handle's own signal.
- * Provided options, ids, and signals are validated at the JavaScript boundary.
+ * `id` labels the handle for tracing. Default: a random UUID. `signal` links a
+ * native parent signal to the handle's own signal. Provided options, ids, and
+ * signals are validated at the JavaScript boundary.
  */
 export interface AbortOptions {
 	readonly id?: string

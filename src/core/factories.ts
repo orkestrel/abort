@@ -8,11 +8,10 @@ import { Abort } from './Abort.js'
  * @remarks
  * The created handle's `signal` fires when its own `abort()` is called; when
  * `options.signal` is given, it ALSO fires when that parent signal aborts (linked
- * via `AbortSignal.any`). Pass `options.id` to label the handle for tracing, or
- * let it default to a random UUID.
+ * through `AbortSignal.any`). Pass `options.id` to label the handle for tracing.
+ * Default: a random UUID for `id`, and no parent link when `signal` is omitted.
  *
- * @param options - Optional `id` (a trace label; defaults to a random UUID) and
- *   `signal` (a parent signal whose abort also fires the created handle's signal)
+ * @param options - Optional trace id and native parent signal
  * @returns A working {@link AbortInterface}
  * @throws {@link import('@orkestrel/contract').ContractError} When provided
  *   options are not a plain record, a defined `id` is not a string, or a
@@ -24,7 +23,7 @@ import { Abort } from './Abort.js'
  *
  * const abort = createAbort()
  * const work = fetch(url, { signal: abort.signal })
- * abort.abort() // cancels the fetch via the linked native signal
+ * abort.abort() // cancels the fetch through the linked native signal
  * ```
  *
  * @example
