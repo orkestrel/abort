@@ -16,7 +16,13 @@
 // in. `.claude/rules/architecture.md` § Declaration placement is what permits
 // that, and every declaration below stays local for the same reason.
 // ============================================================================
-import type { Drift, GuideInterface, GuideModule, SourceExample } from '@orkestrel/guide'
+import type {
+	Drift,
+	GuideInterface,
+	GuideModule,
+	ManifestEntry,
+	SourceExample,
+} from '@orkestrel/guide'
 import {
 	collectExamples,
 	collectKeys,
@@ -39,7 +45,7 @@ import { existsSync, globSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
-/** Names the one option the seed accepts, with the two values it takes. */
+/** Names the option the seed accepts, with the values it takes. */
 const USAGE = 'usage: npm run docs [-- --to guide|--to source]'
 
 /** Matches the files the guide readers reflect over, the same set the gate inventories. */
@@ -60,19 +66,18 @@ const PITCH_KEY = 'pitch'
 /** Pairs one indexed guide with the source it documents and the disagreements between them. */
 interface Row {
 	readonly spec: string
-	readonly module: GuideModule
 	readonly guide: GuideInterface
 	readonly drift: readonly Drift[]
 	readonly titles: ReadonlyMap<string, SourceExample>
 	readonly summaries: ReadonlySet<string>
+	readonly index: ReadonlyMap<string, string>
 }
 
 /** Holds what one direction did with one row: the lines to print and the values to tally. */
 interface Outcome {
 	readonly lines: readonly string[]
 	readonly written: number
-	readonly left: number
-	readonly files: readonly string[]
+	readonly reported: number
 }
 
 /**
@@ -139,7 +144,7 @@ function formatDrift(spec: string, drift: Drift): string {
  * @param reason - What stopped the write.
  * @returns The disagreement's line with the reason after it.
  */
-function formatLeft(spec: string, drift: Drift, reason: string): string {
+function formatReported(spec: string, drift: Drift, reason: string): string {
 	return `${formatDrift(spec, drift)}; ${reason}`
 }
 
@@ -161,13 +166,32 @@ function formatPitch(spec: string, pitch: string | undefined, tagline: string | 
  * @param guide - The parsed guide.
  * @returns One key per documented symbol and per documented member.
  */
-function buildSummaries(guide: GuideInterface): ReadonlySet<string> {
+function collectCells(guide: GuideInterface): ReadonlySet<string> {
 	const keys = new Set<string>()
 	for (const symbol of guide.surface()) keys.add(computeSymbolKey(symbol))
 	for (const group of guide.methods()) {
 		for (const entry of group.methods) keys.add(`${group.interface}.${entry.name}`)
 	}
 	return keys
+}
+
+/**
+ * Collects one line per input the run needs and the workspace does not carry.
+ *
+ * @param files - The workspace inventory the readers reflect over.
+ * @param entries - The indexed rows, or `undefined` when the workspace carries no index.
+ * @returns One line per missing input, each naming the file it is missing.
+ */
+function collectMissing(
+	files: Readonly<Record<string, string>>,
+	entries: readonly ManifestEntry[] | undefined,
+): readonly string[] {
+	if (entries === undefined) {
+		return [`${INDEX_FILE}: the workspace carries no concept index to read`]
+	}
+	return entries
+		.filter((entry) => files[entry.spec] === undefined)
+		.map((entry) => `${entry.spec}: the concept index names it and the workspace does not carry it`)
 }
 
 /**
@@ -246,75 +270,58 @@ function reportRow(row: Row): Outcome {
 	return {
 		lines: row.drift.map((drift) => formatDrift(row.spec, drift)),
 		written: 0,
-		left: row.drift.length,
-		files: [],
+		reported: row.drift.length,
 	}
 }
 
 /**
  * Carries every summary disagreement of one row across to its guide.
  *
- * @param root - The workspace root to write into.
  * @param row - The indexed guide and its disagreements.
- * @param files - The workspace inventory the readers reflect over.
- * @returns The lines left standing, the values to tally, and the file written.
+ * @param texts - The current text of every file, keyed root-relative, rewritten in place.
+ * @returns The lines left standing and the values to tally.
  */
-function writeGuide(root: string, row: Row, files: Readonly<Record<string, string>>): Outcome {
+function writeGuide(row: Row, texts: Map<string, string>): Outcome {
+	const start = texts.get(row.spec)
+	if (start === undefined) return reportRow(row)
 	const lines: string[] = []
-	const start = files[row.spec]
-	if (start === undefined) {
-		return {
-			lines: row.drift.map((drift) => formatDrift(row.spec, drift)),
-			written: 0,
-			left: row.drift.length,
-			files: [],
-		}
-	}
 	let text = start
 	let written = 0
 	for (const drift of row.drift) {
 		if (!row.summaries.has(drift.key)) {
-			lines.push(formatLeft(row.spec, drift, 'the guide fence owns an example'))
+			lines.push(formatReported(row.spec, drift, 'the guide fence owns an example'))
 			continue
 		}
 		if (drift.source === undefined) {
-			lines.push(formatLeft(row.spec, drift, 'the source side carries no text'))
+			lines.push(formatReported(row.spec, drift, 'the source side carries no text'))
 			continue
 		}
 		const replaced = replaceCell(text, drift.key, drift.source)
 		if (replaced === undefined) {
-			lines.push(formatLeft(row.spec, drift, 'no Summary cell carries the key'))
+			lines.push(formatReported(row.spec, drift, 'no Summary cell carries the key'))
 			continue
 		}
+		if (replaced === text) continue
 		text = replaced
 		written += 1
 	}
-	if (text === start) return { lines, written, left: lines.length, files: [] }
-	writeFileSync(resolve(root, row.spec), text)
-	return { lines, written, left: lines.length, files: [row.spec] }
+	if (text !== start) texts.set(row.spec, text)
+	return { lines, written, reported: lines.length }
 }
 
 /**
  * Carries every disagreement of one row across to the source it documents.
  *
- * @param root - The workspace root to write into.
  * @param row - The indexed guide and its disagreements.
- * @param files - The workspace inventory the readers reflect over.
- * @returns The lines left standing, the values to tally, and the files written.
+ * @param texts - The current text of every file, keyed root-relative, rewritten in place.
+ * @returns The lines left standing and the values to tally.
  */
-function writeSource(root: string, row: Row, files: Readonly<Record<string, string>>): Outcome {
-	const index = buildIndex(files, row.module)
-	const texts = new Map<string, string>()
-	for (const file of index.values()) {
-		const text = files[file]
-		if (text !== undefined && !texts.has(file)) texts.set(file, text)
-	}
+function writeSource(row: Row, texts: Map<string, string>): Outcome {
 	const lines: string[] = []
-	const touched = new Set<string>()
 	let written = 0
 	for (const drift of row.drift) {
 		if (drift.guide === undefined) {
-			lines.push(formatLeft(row.spec, drift, 'the guide side carries no text'))
+			lines.push(formatReported(row.spec, drift, 'the guide side carries no text'))
 			continue
 		}
 		const summary = row.summaries.has(drift.key)
@@ -323,16 +330,16 @@ function writeSource(root: string, row: Row, files: Readonly<Record<string, stri
 			? drift.key
 			: example === undefined
 				? undefined
-				: findExample(texts, index, example.name, drift.key)
-		const file = key === undefined ? undefined : index.get(key)
+				: findExample(texts, row.index, example.name, drift.key)
+		const file = key === undefined ? undefined : row.index.get(key)
 		const text = file === undefined ? undefined : texts.get(file)
 		if (key === undefined || file === undefined || text === undefined) {
-			lines.push(formatLeft(row.spec, drift, 'no doc block carries the key'))
+			lines.push(formatReported(row.spec, drift, 'no doc block carries the key'))
 			continue
 		}
 		const span = locateComment(text, key)
 		if (span === undefined) {
-			lines.push(formatLeft(row.spec, drift, 'no doc block carries the key'))
+			lines.push(formatReported(row.spec, drift, 'no doc block carries the key'))
 			continue
 		}
 		const block = text.slice(span.start, span.end)
@@ -341,21 +348,15 @@ function writeSource(root: string, row: Row, files: Readonly<Record<string, stri
 				? replaceSummary(block, drift.guide)
 				: replaceExample(block, splitExample(example.name, drift.key, drift.guide))
 		if (rewritten === undefined) {
-			lines.push(formatLeft(row.spec, drift, 'the doc block refused the rewrite'))
+			lines.push(formatReported(row.spec, drift, 'the doc block refused the rewrite'))
 			continue
 		}
-		texts.set(file, spliceSpan(text, span, rewritten))
-		touched.add(file)
+		const spliced = spliceSpan(text, span, rewritten)
+		if (spliced === text) continue
+		texts.set(file, spliced)
 		written += 1
 	}
-	const changed: string[] = []
-	for (const file of [...touched].sort()) {
-		const text = texts.get(file)
-		if (text === undefined || text === files[file]) continue
-		writeFileSync(resolve(root, file), text)
-		changed.push(file)
-	}
-	return { lines, written, left: lines.length, files: changed }
+	return { lines, written, reported: lines.length }
 }
 
 const args = process.argv.slice(2)
@@ -369,69 +370,85 @@ if (direction === undefined && args.length > 0) {
 } else {
 	const root = process.cwd()
 	const files = readInventory(root)
-	const index = files[INDEX_FILE]
-	if (index === undefined) throw new Error(`The workspace carries no ${INDEX_FILE} to index from`)
-	const rows: Row[] = []
-	for (const entry of parseManifest(index, 'guides')) {
-		const markdown = files[entry.spec]
-		if (markdown === undefined) {
-			throw new Error(`The concept index names ${entry.spec}, which the workspace does not carry`)
+	const manifest = files[INDEX_FILE]
+	const entries = manifest === undefined ? undefined : parseManifest(manifest, 'guides')
+	const missing = collectMissing(files, entries)
+	if (entries === undefined || missing.length > 0) {
+		for (const line of missing) process.stdout.write(`${line}\n`)
+		process.exitCode = 2
+	} else {
+		// One current text per file, seeded once and rewritten in place, so a second
+		// row over the same file rewrites what the first row left rather than the
+		// bytes the run started from. The inventory stays frozen beside it, as what
+		// each flush compares against to decide whether a file moved.
+		const texts = new Map(Object.entries(files))
+		const rows: Row[] = []
+		for (const entry of entries) {
+			const markdown = files[entry.spec]
+			if (markdown === undefined) continue
+			const guide = createGuide(markdown)
+			const source = createSource({ files, module: entry.source })
+			rows.push({
+				spec: entry.spec,
+				guide,
+				drift: findDrift(guide, source),
+				titles: collectTitles(guide, source),
+				summaries: collectCells(guide),
+				index: buildIndex(files, entry.source),
+			})
 		}
-		const guide = createGuide(markdown)
-		const source = createSource({ files, module: entry.source })
-		rows.push({
-			spec: entry.spec,
-			module: entry.source,
-			guide,
-			drift: findDrift(guide, source),
-			titles: collectTitles(guide, source),
-			summaries: buildSummaries(guide),
-		})
-	}
 
-	const lines: string[] = []
-	const changed: string[] = []
-	let found = 0
-	let written = 0
-	let left = 0
-	for (const row of rows) {
-		found += row.drift.length
-		const outcome =
-			direction === undefined
-				? reportRow(row)
-				: direction === 'guide'
-					? writeGuide(root, row, files)
-					: writeSource(root, row, files)
-		lines.push(...outcome.lines)
-		changed.push(...outcome.files)
-		written += outcome.written
-		left += outcome.left
-	}
-
-	const name = readShortName(root)
-	const readme = files[README_FILE]
-	const own = name === undefined ? undefined : rows.find((row) => row.spec === `guides/${name}.md`)
-	if (own !== undefined && readme !== undefined) {
-		const pitch = createGuide(readme).tagline()
-		const tagline = own.guide.tagline()
-		if (pitch !== tagline) {
-			found += 1
-			left += 1
-			lines.push(
+		const lines: string[] = []
+		let found = 0
+		let written = 0
+		let reported = 0
+		for (const row of rows) {
+			found += row.drift.length
+			const outcome =
 				direction === undefined
-					? formatPitch(own.spec, pitch, tagline)
-					: `${formatPitch(own.spec, pitch, tagline)}; the README pitch is authored by hand`,
-			)
+					? reportRow(row)
+					: direction === 'guide'
+						? writeGuide(row, texts)
+						: writeSource(row, texts)
+			lines.push(...outcome.lines)
+			written += outcome.written
+			reported += outcome.reported
 		}
-	}
 
-	for (const file of changed) process.stdout.write(`wrote ${file}\n`)
-	for (const line of lines) process.stdout.write(`${line}\n`)
-	process.stdout.write(
-		direction === undefined
-			? `rows read: ${rows.length}, disagreements found: ${found}\n`
-			: `rows read: ${rows.length}, disagreements found: ${found}, written: ${written}, reported: ${left}\n`,
-	)
-	if (changed.length > 0) process.stdout.write('run npm run format\n')
-	process.exitCode = left > 0 ? 1 : 0
+		const name = readShortName(root)
+		const readme = files[README_FILE]
+		const own =
+			name === undefined ? undefined : rows.find((row) => row.spec === `guides/${name}.md`)
+		if (own !== undefined && readme !== undefined) {
+			const pitch = createGuide(readme).tagline()
+			const tagline = own.guide.tagline()
+			if (pitch !== tagline) {
+				found += 1
+				reported += 1
+				lines.push(
+					direction === undefined
+						? formatPitch(own.spec, pitch, tagline)
+						: `${formatPitch(own.spec, pitch, tagline)}; the README pitch is authored by hand`,
+				)
+			}
+		}
+
+		const changed: string[] = []
+		for (const [file, text] of texts) {
+			if (text === files[file]) continue
+			writeFileSync(resolve(root, file), text)
+			changed.push(file)
+		}
+		changed.sort()
+
+		for (const file of changed) process.stdout.write(`wrote ${file}\n`)
+		for (const line of lines) process.stdout.write(`${line}\n`)
+		process.stdout.write(
+			direction === undefined
+				? `rows read: ${rows.length}, disagreements found: ${found}\n`
+				: `rows read: ${rows.length}, disagreements found: ${found}, written: ${written}, reported: ${reported}\n`,
+		)
+		if (changed.length > 0) process.stdout.write('next: npm run format\n')
+		process.exitCode = reported > 0 ? 1 : 0
+	}
 }
