@@ -27,7 +27,8 @@ export interface AbortInterface {
 	/** Reports whether `signal` has aborted. */
 	readonly aborted: boolean
 	/**
-	 * Aborts the handle, firing `signal`. Aborting is idempotent — the first reason sticks.
+	 * Aborts the underlying controller, flipping `aborted` and firing `signal`. Aborting is
+	 * idempotent — the first reason sticks and every later call is a no-op.
 	 *
 	 * @param reason - The abort reason. A defined reason is kept verbatim (including a falsy
 	 *   `null`, `0`, `''`, or `false`); `undefined` defaults `signal.reason` to an `AbortError`

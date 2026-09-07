@@ -17,13 +17,14 @@ import { Abort } from './Abort.js'
  *   options are not a plain record, a defined `id` is not a string, or a
  *   defined `signal` is not a native `AbortSignal`.
  *
- * @example
+ * @example Create and abort
  * ```ts
  * import { createAbort } from '@orkestrel/abort'
  *
  * const abort = createAbort()
- * const work = fetch(url, { signal: abort.signal })
- * abort.abort() // cancels the fetch through the linked native signal
+ * const stream = openStream({ signal: abort.signal })
+ * // later, to cancel:
+ * abort.abort('user navigated away') // signal.reason carries the value
  * ```
  *
  * @example

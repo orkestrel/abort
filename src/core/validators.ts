@@ -1,5 +1,6 @@
 /**
- * Determines whether a value is a native `AbortSignal`.
+ * Determines whether a value is a native `AbortSignal`, staying total for structural spoofs
+ * and for hostile or revoked proxies.
  *
  * @remarks
  * The platform `AbortSignal.prototype.aborted` getter performs the native brand

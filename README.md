@@ -1,12 +1,13 @@
 # @orkestrel/abort
 
-A typed **`AbortController`** wrapper — the foundational cancellation
-primitive that async work (a fetch, a timeout, a queue task) links into to
-observe cancellation. Deliberately small: a stable, traceable `id`, a
-`signal` that can be linked to a parent signal through `AbortSignal.any` (so a
-parent's abort propagates without re-implementing listener wiring), and
-idempotent `abort()` that preserves whichever reason arrives first. Part of
-the `@orkestrel` line.
+> The cancellation primitive: a thin, traceable wrapper over a native `AbortController` that
+> carries a trace `id`, exposes a standard `AbortSignal`, and links to a parent signal so one
+> cancellation cascades through a tree of handles.
+
+Async work — a fetch, a timeout, a queue task — links into one handle to observe
+cancellation: hand `abort.signal` to anything that already accepts an
+`AbortSignal`, call `abort()` to cancel, and pass a parent `signal` to cascade one
+cancellation across every linked handle. Part of the `@orkestrel` line.
 
 ## Install
 

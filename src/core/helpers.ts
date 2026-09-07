@@ -3,7 +3,8 @@ import { ContractError, isRecord, isString, preview } from '@orkestrel/contract'
 import { isAbortSignal } from './validators.js'
 
 /**
- * Validates and normalizes abort construction options.
+ * Validates once-read abort construction options and returns a fresh normalized copy
+ * omitting absent optional keys.
  *
  * @remarks
  * Omitted options normalize to a fresh empty object. Otherwise each property is
@@ -80,7 +81,8 @@ export function validateAbortOptions(options?: AbortOptions): AbortOptions {
 }
 
 /**
- * Links an own `AbortSignal` to an optional parent signal.
+ * Links an own `AbortSignal` to an optional parent signal, returning
+ * `AbortSignal.any([own, parent])` when a parent is given.
  *
  * @remarks
  * When `parent` is `undefined`, the own signal is returned unchanged. When a
