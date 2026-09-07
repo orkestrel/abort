@@ -13,8 +13,9 @@ export interface AbortOptions {
 }
 
 /**
- * Represents a cancellation handle — a thin, traceable wrapper over a native
- * `AbortController` whose `signal` can be linked to a parent signal.
+ * Represents the cancellation contract a consumer holds — a traceable `id`, the exposed
+ * `AbortSignal`, an `aborted` reading of it, and an idempotent `abort` that cancels the
+ * work bound to that signal.
  *
  * @remarks
  * The native `signal` is the complete interoperable observation surface.

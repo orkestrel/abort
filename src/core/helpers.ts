@@ -8,8 +8,7 @@ import { isAbortSignal } from './validators.js'
  *
  * @remarks
  * Omitted options normalize to a fresh empty object. Otherwise each property is
- * read exactly once before validation. The returned object is a fresh copy and
- * omits absent optional properties. No controller or signal composition begins
+ * read exactly once before validation. No controller or signal composition begins
  * at this boundary.
  *
  * @param options - Potentially untrusted abort options
@@ -85,9 +84,8 @@ export function validateAbortOptions(options?: AbortOptions): AbortOptions {
  * `AbortSignal.any([own, parent])` when a parent is given.
  *
  * @remarks
- * When `parent` is `undefined`, the own signal is returned unchanged. When a
- * parent is given, the result is `AbortSignal.any([own, parent])`, which fires
- * on EITHER the own signal aborting or the parent aborting — without
+ * When `parent` is `undefined`, the own signal is returned unchanged. The combined
+ * signal fires on EITHER the own signal aborting or the parent aborting — without
  * re-implementing listener wiring. A parent that has ALREADY aborted makes the
  * combined signal born aborted (carrying the parent's reason).
  *

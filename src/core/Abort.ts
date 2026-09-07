@@ -2,8 +2,9 @@ import type { AbortInterface, AbortOptions } from './types.js'
 import { linkSignal, validateAbortOptions } from './helpers.js'
 
 /**
- * Represents a cancellation handle — a thin, traceable wrapper over a native
- * `AbortController` whose exposed `signal` can be linked to a parent signal.
+ * Implements {@link AbortInterface} over a private `AbortController` the instance owns,
+ * resolving the trace `id` at construction and exposing either that controller's own
+ * `signal` or one linked to a parent.
  *
  * @remarks
  * - **Own controller.** The instance owns a private `AbortController`; `abort`

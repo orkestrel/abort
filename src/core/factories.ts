@@ -2,8 +2,9 @@ import type { AbortInterface, AbortOptions } from './types.js'
 import { Abort } from './Abort.js'
 
 /**
- * Creates a cancellation handle — a thin, traceable wrapper over a native
- * `AbortController` whose `signal` can be linked to a parent signal.
+ * Creates a cancellation handle from validated options and returns it as an
+ * {@link AbortInterface} — a resolved trace `id` and a `signal` already linked to any
+ * parent given, so a caller holds the published contract rather than the `Abort` class.
  *
  * @remarks
  * The created handle's `signal` fires when its own `abort()` is called; when

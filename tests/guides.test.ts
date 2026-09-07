@@ -44,14 +44,6 @@ const INTERNAL: readonly string[] = Object.freeze([])
 /** Root-level files these checks read. `readInventory` walks directories only. */
 const ROOT_FILES = Object.freeze(['AGENTS.md', 'README.md'])
 
-// The title filter the pin below applies to both sides. `@orkestrel/contract` exports
-// `isNonEmptyString`, which this package could import; the predicate is declared here
-// because this file is a drop-in copied whole into packages that declare no contract
-// dependency, and one shape travels further than one import.
-function isTitle(value: string | undefined): value is string {
-	return value !== undefined && value.length > 0
-}
-
 const root = new URL('../', import.meta.url)
 const files: Record<string, string> = {
 	...readInventory(root, ['src', 'guides', 'tests'], { extensions: ['.ts', '.md'] }),
@@ -83,12 +75,15 @@ it('pairs at least one example title across the guide and the source', () => {
 	const declared = source
 		.examples()
 		.map((example) => example.title)
-		.filter(isTitle)
-	const headings = guide
-		.fences()
-		.map((fence) => fence.title)
-		.filter(isTitle)
-	const paired = headings.filter((title) => declared.includes(title))
+		.filter((title) => title !== undefined)
+	const titled = new Set(declared)
+	const headings: string[] = []
+	const paired: string[] = []
+	for (const fence of guide.fences()) {
+		if (fence.title === undefined) continue
+		headings.push(fence.title)
+		if (titled.has(fence.title)) paired.push(fence.title)
+	}
 	const unpaired =
 		paired.length > 0
 			? []
@@ -150,26 +145,17 @@ for (const entry of manifest) {
 
 		for (const group of guide.methods()) {
 			const members = source.methods(group.interface).map((method) => method.name)
+			const documented = group.methods.map((method) => method.name)
 			const entity = group.interface.replace(/Interface$/, '')
 			describe(`${group.interface}`, () => {
 				it('documents at least one method', () => {
 					expect(group.methods.length).toBeGreaterThan(0)
 				})
 				it('documents every interface method', () => {
-					expect(
-						findMissing(
-							members,
-							group.methods.map((method) => method.name),
-						),
-					).toEqual([])
+					expect(findMissing(members, documented)).toEqual([])
 				})
 				it('documents no phantom method', () => {
-					expect(
-						findMissing(
-							group.methods.map((method) => method.name),
-							members,
-						),
-					).toEqual([])
+					expect(findMissing(documented, members)).toEqual([])
 				})
 				it(`${entity} exposes no undocumented method`, () => {
 					const extra =
@@ -177,7 +163,7 @@ for (const entry of manifest) {
 							? []
 							: findMissing(
 									source.methods(entity).map((method) => method.name),
-									group.methods.map((method) => method.name),
+									documented,
 								)
 					expect(extra).toEqual([])
 				})
@@ -222,26 +208,21 @@ for (const entry of manifest) {
 
 		for (const group of guide.methods()) {
 			const entity = group.interface.replace(/Interface$/, '')
+			const documented = group.methods.map((method) => method.name)
+			const examples =
+				entity === group.interface
+					? source.examples(group.interface).map((example) => example.name)
+					: source
+							.examples(group.interface)
+							.map((example) => example.name)
+							.concat(source.examples(entity).map((example) => example.name))
 			describe(`${group.interface} examples`, () => {
 				it('documents an example for every method', () => {
 					const fences = guide
 						.fences()
 						.filter((fence) => fence.language === EXAMPLE_LANGUAGE)
 						.map((fence) => fence.code)
-					const examples =
-						entity === group.interface
-							? source.examples(group.interface).map((example) => example.name)
-							: source
-									.examples(group.interface)
-									.map((example) => example.name)
-									.concat(source.examples(entity).map((example) => example.name))
-					expect(
-						findUnexampled(
-							group.methods.map((method) => method.name),
-							fences,
-							examples,
-						),
-					).toEqual([])
+					expect(findUnexampled(documented, fences, examples)).toEqual([])
 				})
 			})
 		}

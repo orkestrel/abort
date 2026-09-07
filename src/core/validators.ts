@@ -4,8 +4,7 @@
  *
  * @remarks
  * The platform `AbortSignal.prototype.aborted` getter performs the native brand
- * check. Calling it through `Reflect.apply` rejects structural spoofs while
- * the contained boundary keeps the guard total for hostile or revoked proxies.
+ * check, and `Reflect.apply` calls it inside a contained boundary.
  *
  * @param value - The value to inspect.
  * @returns True if the platform getter accepts `value` as an

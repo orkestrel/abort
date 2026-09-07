@@ -4,10 +4,10 @@
 > carries a trace `id`, exposes a standard `AbortSignal`, and links to a parent signal so one
 > cancellation cascades through a tree of handles.
 
-Async work — a fetch, a timeout, a queue task — links into one handle to observe
-cancellation: hand `abort.signal` to anything that already accepts an
-`AbortSignal`, call `abort()` to cancel, and pass a parent `signal` to cascade one
-cancellation across every linked handle. Part of the `@orkestrel` line.
+Create a handle with the `createAbort` function, hand its signal to the fetch,
+stream, or queue task the handle bounds, and call `abort()` to cancel that work.
+Pass a parent handle's signal where the work is a step of a larger job you
+cancel as a whole. Part of the `@orkestrel` line.
 
 ## Install
 
