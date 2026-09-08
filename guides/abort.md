@@ -45,9 +45,11 @@ Construction is a strict JavaScript boundary. `validateAbortOptions` normalizes 
 
 ### Validators
 
-| API             | Kind     | Summary                                                                                                                       |
-| --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `isAbortSignal` | function | Determines whether a value is a native `AbortSignal`, staying total for structural spoofs and for hostile or revoked proxies. |
+In a guard table a `Shape` cell holds the type the guard narrows to.
+
+| API             | Kind     | Shape         | Summary                                                                                                                       |
+| --------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `isAbortSignal` | function | `AbortSignal` | Determines whether a value is a native `AbortSignal`, staying total for structural spoofs and for hostile or revoked proxies. |
 
 ### Classes
 
@@ -57,12 +59,12 @@ Construction is a strict JavaScript boundary. `validateAbortOptions` normalizes 
 
 ### Types
 
-A `Shape` cell holds an interface's members in braces, and a type alias's value.
+A `Shape` cell holds an interface's data members as bare names in braces, `?` marking an optional member and `plus` introducing its call-signature members, and a type alias's own type literal with a union's arms escaped as `\|`.
 
-| Type             | Kind      | Shape                                   | Summary                                                                                                                                                                                                |
-| ---------------- | --------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `AbortOptions`   | interface | `{ id?: string; signal?: AbortSignal }` | Represents the options for `createAbort` and `Abort` construction.                                                                                                                                     |
-| `AbortInterface` | interface | `{ id, signal, aborted, abort }`        | Represents the cancellation contract a consumer holds — a traceable `id`, the exposed `AbortSignal`, an `aborted` reading of it, and an idempotent `abort` that cancels the work bound to that signal. |
+| Type             | Kind      | Shape                                | Summary                                                                                                                                                                                                |
+| ---------------- | --------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AbortOptions`   | interface | `{ id?, signal? }`                   | Represents the options for `createAbort` and `Abort` construction.                                                                                                                                     |
+| `AbortInterface` | interface | `{ id, signal, aborted } plus abort` | Represents the cancellation contract a consumer holds — a traceable `id`, the exposed `AbortSignal`, an `aborted` reading of it, and an idempotent `abort` that cancels the work bound to that signal. |
 
 The `id`, `signal`, and `aborted` members of `AbortInterface` are `readonly` data members (Surface rows, earlier) — its call-signature method is documented under [Methods](#methods).
 
@@ -95,6 +97,8 @@ These invariants hold across `src/core` ↔ `abort.md`:
 ## Patterns
 
 ### Create and abort
+
+Create a handle, hand its `signal` to cancellable work, and call `abort(reason)` to cancel it:
 
 ```ts
 import { createAbort } from '@orkestrel/abort'
