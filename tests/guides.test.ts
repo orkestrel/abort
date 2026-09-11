@@ -1,27 +1,10 @@
-// The consumer-side guides-parity drop-in: runs `@orkestrel/guide`'s checks against
-// this repo's own `guides/README.md` manifest. The constants that follow are this
+// The consumer-side guides-parity entry runs `@orkestrel/guide` against this
+// repository's own `guides/README.md` manifest. The constants that follow are this
 // package's own, as is the executed section that closes the file.
 
-import { describe, expect, it } from 'vitest'
-import {
-	computeSymbolKey,
-	createGuide,
-	createSource,
-	createSourceManager,
-	extractFenceImports,
-	findDrift,
-	findMissing,
-	findMissingSymbols,
-	findUnexampled,
-	findUnlisted,
-	isExternalLink,
-	parseManifest,
-	resolveLink,
-} from '@orkestrel/guide'
-import { readFileSync } from 'node:fs'
-import { createRecorder, requireValue } from '@orkestrel/test'
+import { GuideCommand } from '@orkestrel/guide/server'
 import { readInventory } from '@orkestrel/test/server'
-import { createAbort } from '@src/core'
+import { createVitest } from 'vitest/node'
 
 /** Every fence language this package's guides are allowed to use. */
 const FENCE_LANGUAGES = Object.freeze(['ts'])
@@ -29,295 +12,225 @@ const FENCE_LANGUAGES = Object.freeze(['ts'])
 const EXAMPLE_LANGUAGE = 'ts'
 /** The one guide this package sources, whose tagline the README pitch equals. */
 const GUIDE_SPEC = 'guides/abort.md'
+/** The package identity that binds its manifest, module map, and README pitch. */
+const PACKAGE_NAME = '@orkestrel/abort'
 /** Each import specifier this package's own guides may resolve against. */
-const MODULES = Object.freeze({ '@orkestrel/abort': 'src/core', '@src/core': 'src/core' })
+const MODULES = Object.freeze({ [PACKAGE_NAME]: 'src/core', '@src/core': 'src/core' })
 /**
  * Declarations deliberately kept out of the barrel, as `computeSymbolKey` strings.
  *
  * A class that one-class-per-file evicted from its single consumer cannot become a
  * local, so it stays exported without being public. Naming it here is what makes that
- * intentional rather than forgotten — and the assertion that follows it fails when a name
+ * intentional rather than forgotten, and the assertion that follows it fails when a name
  * here stops being stranded, so the list cannot rot.
  */
 const INTERNAL: readonly string[] = Object.freeze([])
 
-/** Root-level files these checks read. `readInventory` walks directories only. */
-const ROOT_FILES = Object.freeze(['AGENTS.md', 'README.md'])
+await new GuideCommand({
+	root: new URL('../', import.meta.url),
+	patterns: ['src/**/*.ts', 'tests/**/*.ts', 'guides/*.md', '*.md', 'package.json'],
+	modules: MODULES,
+	languages: FENCE_LANGUAGES,
+	language: EXAMPLE_LANGUAGE,
+	reader: readInventory,
+	runner: createVitest,
+}).execute(async ({ files, report, rows }) => {
+	const { isRecord, parseJSON } = await import('@orkestrel/contract')
+	const { computeSymbolKey, findMissingSymbols } = await import('@orkestrel/guide')
+	const { createRecorder, requireValue } = await import('@orkestrel/test')
+	const barrel = await import('@src/core')
+	const { Abort, createAbort } = barrel
+	const { describe, expect, it } = await import('vitest')
+	const own = requireValue(
+		rows.find((row) => row.entry.spec === GUIDE_SPEC),
+		`Missing manifest row: ${GUIDE_SPEC}`,
+	)
+	const manifest = parseJSON(requireValue(files['package.json'], 'Missing inventory: package.json'))
+	if (!isRecord(manifest)) throw new Error('Invalid package manifest: package.json')
 
-const root = new URL('../', import.meta.url)
-const files: Record<string, string> = {
-	...readInventory(root, ['src', 'guides', 'tests'], { extensions: ['.ts', '.md'] }),
-}
-for (const name of ROOT_FILES) files[name] = readFileSync(new URL(name, root), 'utf8')
-const manifest = parseManifest(
-	requireValue(files['guides/README.md'], 'Missing file: guides/README.md'),
-	'guides',
-)
-const sources = createSourceManager({ files, modules: MODULES })
-const own = requireValue(
-	manifest.find((entry) => entry.spec === GUIDE_SPEC),
-	`Missing manifest row: ${GUIDE_SPEC}`,
-)
+	it('manifest lists at least one guide', () => {
+		expect(report.input).toEqual([])
+		expect(rows.length).toBeGreaterThan(0)
+		expect(rows.map((row) => row.entry.spec)).toContain(GUIDE_SPEC)
+	})
 
-it('manifest lists at least one guide', () => {
-	expect(manifest.length).toBeGreaterThan(0)
-})
+	// The example half of the equality case is silent over an empty population: with no
+	// title on either side, the comparison has no pair. This pins the population this
+	// repository's own guide contributes.
+	it('pairs at least one example title across the guide and the source', () => {
+		expect(report.examples.titles.filter((finding) => finding.spec === GUIDE_SPEC)).toEqual([])
+	})
 
-// The example half of the equality case is silent over an empty population: with no
-// title on both sides `findDrift` compares no pair and the case passes on the summaries
-// alone. This pins the population this repository's own guide contributes, so removing
-// every `@example` title reddens the suite instead of quietly retiring half the gate.
-// The failure names both title sets, because a pin reporting only its own emptiness
-// leaves the reader to work out which side dropped the title.
-it('pairs at least one example title across the guide and the source', () => {
-	const guide = createGuide(requireValue(files[GUIDE_SPEC], `Missing file: ${GUIDE_SPEC}`))
-	const source = createSource({ files, module: own.source })
-	const declared = source
-		.examples()
-		.map((example) => example.title)
-		.filter((title) => title !== undefined)
-	const titled = new Set(declared)
-	const headings: string[] = []
-	const paired: string[] = []
-	for (const fence of guide.fences()) {
-		if (fence.title === undefined) continue
-		headings.push(fence.title)
-		if (titled.has(fence.title)) paired.push(fence.title)
+	it('opens the README with the guide tagline', () => {
+		expect(manifest.name).toBe(PACKAGE_NAME)
+		expect(report.pitch).toEqual([])
+	})
+
+	for (const { entry, guide, source } of rows) {
+		describe(`${entry.concept}`, () => {
+			it('uses only listed fence languages', () => {
+				expect(report.fences.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+
+			it('extracts a non-empty documented surface', () => {
+				expect(guide.surface().length).toBeGreaterThan(0)
+			})
+
+			it('carries a summary for every documented and declared symbol', () => {
+				expect(guide.surface().filter((symbol) => symbol.summary === undefined)).toEqual([])
+				expect(source.surface().filter((symbol) => symbol.summary === undefined)).toEqual([])
+			})
+
+			it('re-exports every direct declaration that is not named internal', () => {
+				const stranded = findMissingSymbols(source.exports(), source.surface())
+				expect(stranded.filter((key) => !INTERNAL.includes(key))).toEqual([])
+			})
+
+			it('names no symbol internal that the barrel already exports', () => {
+				const stranded = findMissingSymbols(source.exports(), source.surface())
+				expect(INTERNAL.filter((key) => !stranded.includes(key))).toEqual([])
+			})
+
+			it('re-exports only direct declarations', () => {
+				expect(findMissingSymbols(source.surface(), source.exports())).toEqual([])
+			})
+
+			it('documents every barrel export', () => {
+				expect(findMissingSymbols(source.surface(), guide.surface())).toEqual([])
+			})
+
+			it('documents only barrel exports', () => {
+				expect(findMissingSymbols(guide.surface(), source.surface())).toEqual([])
+			})
+
+			it('exposes no hidden module-scope declarations', () => {
+				expect(source.hidden().map(computeSymbolKey)).toEqual([])
+			})
+
+			it('documents a populated method group', () => {
+				expect(report.sections.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+
+			it('keeps behavioral interfaces and implementing classes in parity', () => {
+				expect(report.methods.filter((finding) => finding.spec === entry.spec)).toEqual([])
+				expect(report.declarations.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+
+			it('keeps every compared summary and example equal to its source', () => {
+				expect(report.drift.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+
+			it('documents an example for every Surface function', () => {
+				expect(report.examples.fences.filter((finding) => finding.spec === entry.spec)).toEqual([])
+				expect(report.examples.functions.filter((finding) => finding.spec === entry.spec)).toEqual(
+					[],
+				)
+			})
+
+			it('documents an example for every method', () => {
+				expect(report.examples.methods.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+
+			it('imports only real exports in every ```ts fence', () => {
+				expect(report.imports.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+
+			it('resolves every relative link', () => {
+				expect(report.links.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+
+			it('links only to test files that exist', () => {
+				expect(report.tests.filter((finding) => finding.spec === entry.spec)).toEqual([])
+			})
+		})
 	}
-	const unpaired =
-		paired.length > 0
-			? []
-			: [
-					`${GUIDE_SPEC} pairs: guide ${JSON.stringify(headings)} source ${JSON.stringify(declared)}`,
-				]
-	expect(unpaired).toEqual([])
-})
 
-// The README's pitch and the guide's tagline are one text, each read as the blockquote
-// under its file's H1. `README.md` is outside the concept index, so the reader is
-// applied to it directly rather than through a manifest row. Each side is guarded
-// against `undefined` first, so a file that lost its blockquote reports that rather
-// than reporting two absences as agreement.
-it('opens the README with the guide tagline', () => {
-	const pitch = createGuide(requireValue(files['README.md'], 'Missing file: README.md')).tagline()
-	const tagline = createGuide(
-		requireValue(files[GUIDE_SPEC], `Missing file: ${GUIDE_SPEC}`),
-	).tagline()
-
-	expect(pitch).not.toBeUndefined()
-	expect(tagline).not.toBeUndefined()
-	expect(pitch).toBe(tagline)
-})
-
-for (const entry of manifest) {
-	const guide = createGuide(requireValue(files[entry.spec], `Missing file: ${entry.spec}`))
-	const source = createSource({ files, module: entry.source })
-
-	describe(`${entry.concept}`, () => {
-		it('uses only listed fence languages', () => {
-			expect(findUnlisted(guide.fences(), FENCE_LANGUAGES)).toEqual([])
-		})
-
-		it('extracts a non-empty documented surface', () => {
-			expect(guide.surface().length).toBeGreaterThan(0)
-		})
-		it('re-exports every direct declaration that is not named internal', () => {
-			const stranded = findMissingSymbols(source.exports(), source.surface())
-			expect(stranded.filter((key) => !INTERNAL.includes(key))).toEqual([])
-		})
-		it('names no symbol internal that the barrel already exports', () => {
-			const stranded = findMissingSymbols(source.exports(), source.surface())
-			expect(INTERNAL.filter((key) => !stranded.includes(key))).toEqual([])
-		})
-		it('re-exports only direct declarations', () => {
-			expect(findMissingSymbols(source.surface(), source.exports())).toEqual([])
-		})
-		it('documents every barrel export', () => {
-			expect(findMissingSymbols(source.surface(), guide.surface())).toEqual([])
-		})
-		it('documents only barrel exports', () => {
-			expect(findMissingSymbols(guide.surface(), source.surface())).toEqual([])
-		})
-
-		it('exposes no hidden module-scope declarations', () => {
-			expect(source.hidden().map(computeSymbolKey)).toEqual([])
-		})
-
-		for (const group of guide.methods()) {
-			const members = source.methods(group.interface).map((method) => method.name)
-			const documented = group.methods.map((method) => method.name)
-			const entity = group.interface.replace(/Interface$/, '')
-			describe(`${group.interface}`, () => {
-				it('documents at least one method', () => {
-					expect(group.methods.length).toBeGreaterThan(0)
-				})
-				it('documents every interface method', () => {
-					expect(findMissing(members, documented)).toEqual([])
-				})
-				it('documents no phantom method', () => {
-					expect(findMissing(documented, members)).toEqual([])
-				})
-				it(`${entity} exposes no undocumented method`, () => {
-					const extra =
-						entity === group.interface
-							? []
-							: findMissing(
-									source.methods(entity).map((method) => method.name),
-									documented,
-								)
-					expect(extra).toEqual([])
-				})
-			})
-		}
-
-		// The equality gate: a `Summary` cell against its export's description paragraph, a
-		// titled fence against the `@example` of that title. `findDrift` owns the comparison
-		// and names both sides; converge the two sides with `npm run docs`, never by
-		// weakening this assertion. `findDrift` pairs an example only where a title is
-		// present on both sides, so an untitled `@example` block is outside this case. Each
-		// collected line is the spec, the key, and each side's text or `absent` — the same
-		// worklist `npm run docs` prints, so a failure here is read the way that command's
-		// output is.
-		it('keeps every compared summary and example equal to its source', () => {
-			const disagreeing: string[] = []
-			for (const drift of findDrift(guide, source)) {
-				const left = drift.guide === undefined ? 'absent' : JSON.stringify(drift.guide)
-				const right = drift.source === undefined ? 'absent' : JSON.stringify(drift.source)
-				disagreeing.push(`${entry.spec} ${drift.key}: guide ${left} source ${right}`)
+	describe('runtime parity', () => {
+		it('publishes only the documented implementation class', () => {
+			const classes: string[] = []
+			for (const [name, value] of Object.entries(barrel)) {
+				if (typeof value === 'function' && /^[A-Z]/.test(name)) classes.push(name)
 			}
-			expect(disagreeing).toEqual([])
+			expect(classes.sort()).toEqual(['Abort'])
+			expect(own.guide.surface().some((symbol) => symbol.name === 'Abort')).toBe(true)
 		})
 
-		it('documents an example for every Surface function', () => {
-			const fences = guide
-				.fences()
-				.filter((fence) => fence.language === EXAMPLE_LANGUAGE)
-				.map((fence) => fence.code)
-			const names = guide
-				.surface()
-				.filter((symbol) => symbol.keyword === 'function')
-				.map((symbol) => symbol.name)
-			expect(
-				findUnexampled(
-					names,
-					fences,
-					source.examples().map((example) => example.name),
-				),
-			).toEqual([])
-		})
-
-		for (const group of guide.methods()) {
-			const entity = group.interface.replace(/Interface$/, '')
-			const documented = group.methods.map((method) => method.name)
-			const examples =
-				entity === group.interface
-					? source.examples(group.interface).map((example) => example.name)
-					: source
-							.examples(group.interface)
-							.map((example) => example.name)
-							.concat(source.examples(entity).map((example) => example.name))
-			describe(`${group.interface} examples`, () => {
-				it('documents an example for every method', () => {
-					const fences = guide
-						.fences()
-						.filter((fence) => fence.language === EXAMPLE_LANGUAGE)
-						.map((fence) => fence.code)
-					expect(findUnexampled(documented, fences, examples)).toEqual([])
-				})
+		it('carries exactly the method its interface documents', () => {
+			const names = Object.getOwnPropertyNames(Abort.prototype)
+			const methods = names.filter((name) => {
+				const descriptor = Object.getOwnPropertyDescriptor(Abort.prototype, name)
+				return (
+					name !== 'constructor' &&
+					descriptor !== undefined &&
+					typeof descriptor.value === 'function'
+				)
 			})
-		}
+			const group = requireValue(
+				own.guide.methods().find((entry) => entry.interface === 'AbortInterface'),
+				'Missing method group: AbortInterface',
+			)
 
-		it('imports only real exports in every ```ts fence', () => {
-			const fences = guide.fences().filter((fence) => fence.language === EXAMPLE_LANGUAGE)
-			for (const fence of fences) {
-				for (const { specifier, names } of extractFenceImports(fence.code)) {
-					const imported = sources.source(specifier)
-					if (imported === undefined) continue
-					const surface = imported.surface().map((symbol) => symbol.name)
-					expect(findMissing(names, surface)).toEqual([])
-				}
-			}
+			expect(methods).toEqual(group.methods.map((method) => method.name))
 		})
 
-		it('resolves every relative link', () => {
-			const broken = guide
-				.links()
-				.filter((href) => !isExternalLink(href))
-				.map((href) => resolveLink(entry.spec, href))
-				.filter((path) => !source.exists(path))
-			expect(broken).toEqual([])
-		})
-		it('links only to test files that exist', () => {
-			const missing = guide
-				.tests()
-				.map((href) => resolveLink(entry.spec, href))
-				.filter((path) => !source.exists(path))
-			expect(missing).toEqual([])
+		it('documents every prototype accessor and hides every symbol member', () => {
+			const accessors = Object.getOwnPropertyNames(Abort.prototype).filter((name) => {
+				const descriptor = Object.getOwnPropertyDescriptor(Abort.prototype, name)
+				return descriptor !== undefined && typeof descriptor.get === 'function'
+			})
+			const guideText = requireValue(files[GUIDE_SPEC], `Missing file: ${GUIDE_SPEC}`)
+
+			for (const accessor of accessors) expect(guideText).toContain(`\`${accessor}\``)
+			expect(Object.getOwnPropertySymbols(Abort.prototype)).toEqual([])
 		})
 	})
-}
 
-// The EXECUTED half. Every preceding check reads a name — from the guide text or
-// from the barrel — and a name that resolves proves nothing about the sentence
-// beside it, so a fence whose comment claims a value the code contradicts passes
-// all of them. The cases here run the flagship fences and assert the values their
-// comments claim. Change a fence, change the transcription beside it.
-describe('flagship fences', () => {
-	const guideText = requireValue(files[GUIDE_SPEC], `Missing file: ${GUIDE_SPEC}`)
+	// The EXECUTED half. Every preceding check reads a name from guide or source text.
+	// These cases run the flagship fences and assert the values their comments claim.
+	describe('flagship fences', () => {
+		const guideText = requireValue(files[GUIDE_SPEC], `Missing file: ${GUIDE_SPEC}`)
 
-	it('cascades a parent abort into the child, flipping aborted and firing the signal', () => {
-		// Transcribed from the parent-linking fence. Its comment claims both that the
-		// child reads aborted and that the child's signal fired, so the recorder proves
-		// the event beside the flag rather than in place of it.
-		const parent = createAbort({ id: 'request' })
-		const child = createAbort({ id: 'sub-task', signal: parent.signal })
-		const fired = createRecorder<readonly []>()
-		child.signal.addEventListener('abort', fired.handler)
+		it('cascades a parent abort into the child, flipping aborted and firing the signal', () => {
+			const parent = createAbort({ id: 'request' })
+			const child = createAbort({ id: 'sub-task', signal: parent.signal })
+			const fired = createRecorder<readonly []>()
+			child.signal.addEventListener('abort', fired.handler)
 
-		parent.abort()
+			parent.abort()
 
-		expect(child.aborted).toBe(true)
-		expect(fired.count).toBe(1)
-	})
+			expect(child.aborted).toBe(true)
+			expect(fired.count).toBe(1)
+		})
 
-	it('keeps the abort reason the create-and-abort fence claims', () => {
-		// Transcribed from the create-and-abort fence, minus its `openStream` line,
-		// which this package does not publish. The comment claims `signal.reason`
-		// carries the value handed to `abort`.
-		const abort = createAbort()
+		it('keeps the abort reason the create-and-abort fence claims', () => {
+			const abort = createAbort()
 
-		abort.abort('user navigated away')
+			abort.abort('user navigated away')
 
-		expect(abort.signal.reason).toBe('user navigated away')
-	})
+			expect(abort.signal.reason).toBe('user navigated away')
+		})
 
-	it('flips aborted on the handle the quick-start fence creates', () => {
-		// Transcribed from the Surface quick-start fence, minus its `fetch` line, which
-		// would make a network call. The comment claims `aborted` flips true, and that
-		// half of it runs without the request.
-		const abort = createAbort({ id: 'fetch-user' })
+		it('flips aborted on the handle the quick-start fence creates', () => {
+			const abort = createAbort({ id: 'fetch-user' })
 
-		abort.abort()
+			abort.abort()
 
-		expect(abort.aborted).toBe(true)
-	})
+			expect(abort.aborted).toBe(true)
+		})
 
-	it('carries the fence lines the transcriptions copy', () => {
-		// The presence guards beside the transcriptions: they prove the transcribed
-		// lines are still the documented ones, and nothing about behavior. Binding the
-		// construction line alone would leave a comment free to claim the opposite
-		// value and stay green, so every line carrying a claim is bound.
-		expect(guideText).toContain(
-			"const child = createAbort({ id: 'sub-task', signal: parent.signal })",
-		)
-		expect(guideText).toContain(
-			'parent.abort() // child.aborted is now true; child.signal has fired',
-		)
-		expect(guideText).toContain(
-			"abort.abort('user navigated away') // signal.reason carries the value",
-		)
-		expect(guideText).toContain(
-			'abort.abort() // cancels the in-flight fetch through the native signal; `aborted` flips true',
-		)
+		it('carries the fence lines the transcriptions copy', () => {
+			expect(guideText).toContain(
+				"const child = createAbort({ id: 'sub-task', signal: parent.signal })",
+			)
+			expect(guideText).toContain(
+				'parent.abort() // child.aborted is now true; child.signal has fired',
+			)
+			expect(guideText).toContain(
+				"abort.abort('user navigated away') // signal.reason carries the value",
+			)
+			expect(guideText).toContain(
+				'abort.abort() // cancels the in-flight fetch through the native signal; `aborted` flips true',
+			)
+		})
 	})
 })
