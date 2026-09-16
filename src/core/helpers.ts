@@ -1,5 +1,5 @@
 import type { AbortOptions } from './types.js'
-import { ContractError, isRecord, isString, preview } from '@orkestrel/contract'
+import { ContractError, isRecord, isString, preview, readValue } from '@orkestrel/contract'
 import { isAbortSignal } from './validators.js'
 
 /**
@@ -35,22 +35,15 @@ export function validateAbortOptions(options?: AbortOptions): AbortOptions {
 	}
 
 	const input: AbortOptions = options
-	let id: AbortOptions['id']
-	let signal: AbortOptions['signal']
-	try {
-		id = input.id
-		signal = input.signal
-	} catch (cause) {
-		throw new ContractError('Abort: options could not be read', {
-			code: 'bound',
-			context: {
-				path: ['options'],
-				limit: 'readable plain record',
-				received: preview(options),
-			},
-			cause,
-		})
-	}
+	const { id, signal } = readValue(() => ({ id: input.id, signal: input.signal }), 'Abort', {
+		subject: 'options',
+		code: 'bound',
+		context: {
+			path: ['options'],
+			limit: 'readable plain record',
+			received: preview(options),
+		},
+	})
 
 	if (id !== undefined && !isString(id)) {
 		throw new ContractError('Abort: id must be a string when defined', {

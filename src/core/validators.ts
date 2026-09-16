@@ -1,3 +1,5 @@
+import { holds, isFunction } from '@orkestrel/contract'
+
 /**
  * Determines whether a value is a native `AbortSignal`, staying total for structural spoofs
  * and for hostile or revoked proxies.
@@ -19,12 +21,10 @@
  * ```
  */
 export function isAbortSignal(value: unknown): value is AbortSignal {
-	try {
+	return holds(() => {
 		const getter = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')?.get
-		if (getter === undefined) return false
+		if (!isFunction(getter)) return false
 		Reflect.apply(getter, value, [])
 		return true
-	} catch {
-		return false
-	}
+	})
 }
