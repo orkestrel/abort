@@ -106,8 +106,7 @@ describe('Abort', () => {
 	it('default ids are unique across many instances', () => {
 		// A UUID collision would silently alias two unrelated cancellations — assert
 		// the default `id` is distinct across a large batch, not a pair.
-		const ids = new Set<string>()
-		for (let index = 0; index < 1_000; index += 1) ids.add(new Abort().id)
+		const ids = new Set(Array.from({ length: 1_000 }, () => new Abort().id))
 
 		expect(ids.size).toBe(1_000)
 	})

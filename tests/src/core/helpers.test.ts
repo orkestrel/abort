@@ -4,15 +4,6 @@ import { linkSignal, validateAbortOptions } from '@src/core'
 import { captureError, createRecorder } from '@orkestrel/test'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-let reads: PropertyKey[] = []
-
-const handler: ProxyHandler<AbortOptions> = {
-	get(target, property, receiver) {
-		reads.push(property)
-		return Reflect.get(target, property, receiver)
-	},
-}
-
 describe('validateAbortOptions', () => {
 	it('normalizes omitted options to a fresh empty object', () => {
 		const first = validateAbortOptions()
@@ -43,10 +34,15 @@ describe('validateAbortOptions', () => {
 	})
 
 	it('reads each declared property exactly once', () => {
-		reads = []
+		const reads: PropertyKey[] = []
 		const input = new Proxy<AbortOptions>(
 			{ id: 'request', signal: new AbortController().signal },
-			handler,
+			{
+				get(target, property, receiver) {
+					reads.push(property)
+					return Reflect.get(target, property, receiver)
+				},
+			},
 		)
 
 		const output = validateAbortOptions(input)
