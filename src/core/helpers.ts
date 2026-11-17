@@ -1,5 +1,5 @@
 import type { AbortOptions } from './types.js'
-import { ContractError, isRecord, isString, preview, readValue } from '@orkestrel/contract'
+import { isRecord, isString, preview, readValue, refuseValue } from '@orkestrel/contract'
 import { isAbortSignal } from './validators.js'
 
 /**
@@ -23,16 +23,10 @@ import { isAbortSignal } from './validators.js'
  */
 export function validateAbortOptions(options?: AbortOptions): AbortOptions {
 	if (options === undefined) return {}
-	if (!isRecord(options)) {
-		throw new ContractError('Abort: options must be a plain record when defined', {
-			code: 'bound',
-			context: {
-				path: ['options'],
-				limit: 'plain record or undefined',
-				received: preview(options),
-			},
-		})
-	}
+	refuseValue(options, isRecord, 'Abort', {
+		path: ['options'],
+		limit: 'plain record or undefined',
+	})
 
 	const input: AbortOptions = options
 	const { id, signal } = readValue(() => ({ id: input.id, signal: input.signal }), 'Abort', {
@@ -45,26 +39,16 @@ export function validateAbortOptions(options?: AbortOptions): AbortOptions {
 		},
 	})
 
-	if (id !== undefined && !isString(id)) {
-		throw new ContractError('Abort: id must be a string when defined', {
-			code: 'literal',
-			context: {
-				path: ['options', 'id'],
-				limit: 'string or undefined',
-				received: preview(id),
-			},
-		})
-	}
-	if (signal !== undefined && !isAbortSignal(signal)) {
-		throw new ContractError('Abort: signal must be a native AbortSignal when defined', {
-			code: 'placement',
-			context: {
-				path: ['options', 'signal'],
-				limit: 'native AbortSignal or undefined',
-				received: preview(signal),
-			},
-		})
-	}
+	refuseValue(id, (value) => value === undefined || isString(value), 'Abort', {
+		path: ['options', 'id'],
+		limit: 'string or undefined',
+		code: 'literal',
+	})
+	refuseValue(signal, (value) => value === undefined || isAbortSignal(value), 'Abort', {
+		path: ['options', 'signal'],
+		limit: 'native AbortSignal or undefined',
+		code: 'placement',
+	})
 
 	if (id !== undefined && signal !== undefined) return { id, signal }
 	if (id !== undefined) return { id }
@@ -98,26 +82,16 @@ export function validateAbortOptions(options?: AbortOptions): AbortOptions {
  * ```
  */
 export function linkSignal(own: AbortSignal, parent: AbortSignal | undefined): AbortSignal {
-	if (!isAbortSignal(own)) {
-		throw new ContractError('linkSignal own value must be an AbortSignal', {
-			code: 'placement',
-			context: {
-				path: ['own'],
-				limit: 'native AbortSignal',
-				received: preview(own),
-			},
-		})
-	}
-	if (parent !== undefined && !isAbortSignal(parent)) {
-		throw new ContractError('linkSignal parent value must be an AbortSignal', {
-			code: 'placement',
-			context: {
-				path: ['parent'],
-				limit: 'native AbortSignal or undefined',
-				received: preview(parent),
-			},
-		})
-	}
+	refuseValue(own, isAbortSignal, 'linkSignal', {
+		path: ['own'],
+		limit: 'native AbortSignal',
+		code: 'placement',
+	})
+	refuseValue(parent, (value) => value === undefined || isAbortSignal(value), 'linkSignal', {
+		path: ['parent'],
+		limit: 'native AbortSignal or undefined',
+		code: 'placement',
+	})
 
 	return parent === undefined ? own : AbortSignal.any([own, parent])
 }

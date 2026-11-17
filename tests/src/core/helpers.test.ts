@@ -88,6 +88,7 @@ describe('validateAbortOptions', () => {
 			expect(isContractError(error)).toBe(true)
 			if (!isContractError(error)) throw new Error('Expected a ContractError')
 			expect(error.code).toBe(code)
+			expect(error.message).toBe(`Abort: ${path.join('.')} must be ${limit}`)
 			expect(error.context).toEqual({ path, limit, received })
 		},
 	)
@@ -154,6 +155,7 @@ describe('linkSignal', () => {
 		expect(isContractError(error)).toBe(true)
 		if (!isContractError(error)) throw new Error('Expected a ContractError')
 		expect(error.code).toBe('placement')
+		expect(error.message).toBe('linkSignal: own must be native AbortSignal')
 		expect(error.context).toEqual({
 			path: ['own'],
 			limit: 'native AbortSignal',
@@ -169,6 +171,7 @@ describe('linkSignal', () => {
 		expect(isContractError(error)).toBe(true)
 		if (!isContractError(error)) throw new Error('Expected a ContractError')
 		expect(error.code).toBe('placement')
+		expect(error.message).toBe('linkSignal: parent must be native AbortSignal or undefined')
 		expect(error.context).toEqual({
 			path: ['parent'],
 			limit: 'native AbortSignal or undefined',
